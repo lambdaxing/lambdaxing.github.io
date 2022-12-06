@@ -2,10 +2,9 @@
 title: Database System Concepts - notes
 author: lambdaxing
 date: 2022-12-06 18:00:00 +0800
-categories: [Notes, DB]
-tags: [DB]
+categories: [Notes, Database]
+tags: [Database]
 ---
-
 
 &emsp;&emsp;《Database System Concepts: Sixth Edition》笔记。
 
