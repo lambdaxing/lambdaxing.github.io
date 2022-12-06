@@ -1,7 +1,7 @@
 ---
 title: Database System Concepts - notes
 author: lambdaxing
-date: 2022-12-06 18:00:00 +0800
+date: 2022-12-05 18:00:00 +0800
 categories: [Notes, OS]
 tags: [OS]
 ---
