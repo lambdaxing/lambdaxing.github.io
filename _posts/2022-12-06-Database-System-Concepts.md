@@ -346,6 +346,7 @@ SQL 不允许在用 count(*) 时使用 distinct。
 + 子查询嵌套在 where 子句中，通常用于对集合的成员资格、集合的比较以及集合的基数进行检查。
     - 成员资格：连接词 in 测试元组是否是集合（由 select 子句产生的一组值构成）中的成员；连接词 not in 测试元组是否不是集合中的成员。in 和 not in 操作符也能用于枚举集合，也能在多属性关系中测试成员资格。
     - 集合的比较。some 关键字表示某一个，all 关键字表示所有的。= some 等价于 in，<> all 等价于 not in。关键字 any 与 some 同义。
+
     ```sql
     找出工资比生物系教师的所有工资集合中的某一成员高的教师名字：
             select name
@@ -362,6 +363,7 @@ SQL 不允许在用 count(*) 时使用 distinct。
 
     <some, <=some, >=some, =some 和 <>some 以及 <all, <=all, >=all, =all 和 <>all 都是允许的。
     ```
+    
     - exists 测试在作为参数的子查询结果中是否存在元组；not exists 测试子查询结果集中是否不存在元组。满足相应条件时，返回 true。
     - unique 测试在作为参数的子查询结果中是否存在重复元组。not unique 测试在子查询结果集中是否存在不存在重复元组。
 + SQL 允许在 from 子句中使用子查询表达式。因为子查询表达式返回的结果都是关系。可以用 as 子句给子查询的结果关系起个名字，并对属性进行重命名。在 from 子句的子查询用关键字 lateral 作为前缀可以访问 from 子句中在它前面的表或子查询中的属性。
@@ -396,7 +398,7 @@ SQL 不允许在用 count(*) 时使用 distinct。
             select budget
             from department, max_budget
             where department.budget = max_budget.value;
-    查处所有工资总额大于等于所有系平均工资总额的系：
+    查找所有工资总额大于等于所有系平均工资总额的系：
             with dept_total (dept_name, value) as
                 (select dept_name, sum(salary)
                  from instructor
@@ -422,6 +424,32 @@ SQL 不允许在用 count(*) 时使用 distinct。
     ```
 
 #### h. 数据库的修改
+
++ 删除。其中 P 代表一个谓词，r 代表一个关系，delete 语句从 r 中找出所有使 P(t) 为真的元组 t，然后把它们从 r 中删除。
+
+    ```sql
+            delete from r
+            where P;
+    // 删除 instructor 关系中的所有元组：
+            delete from instructor;
+    // 删除与Finance系的教师元组：
+            delete from instructor
+            where dept_name = 'Finance';
+    // 删除位于 Watson 大楼的系的教师元组：
+            delete from instructor
+            where dept_name in (select dept_name
+                                from department
+                                where building = 'Watson');
+    // 删除工资低于平均工资的教师记录：
+            delete from instructor
+            where salary < (select avg(salary)
+                            from instructor);
+    // 在执行任何删除前会先进行每一个元组的测试检查，然后删除符合条件的元组，从而以防结果依赖于元组被处理的顺序。
+    ```
+
++ 插入
+
++ 更新
 
 ### （3）中级 SQL
 
