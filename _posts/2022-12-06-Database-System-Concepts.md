@@ -245,7 +245,7 @@ tags: [Database]
         select A1, A2, ..., An
         from r1 natural join r2 natural join ... natural join rm
         where P;
-- -更为一般地，from 子句可以为如下形式：
+-- 更为一般地，from 子句可以为如下形式：
         from E1，E2, ..., En
 -- 其中每个Ei可以是单个关系或一个包含自然连接的表达式。一个例子：
         select name, title
@@ -519,6 +519,6 @@ tags: [Database]
             );
     ```
 
-### （3）中级 SQL
+## 3. 中级 SQL
 
-### （4）高级 SQL0
+## 4. 高级 SQL
