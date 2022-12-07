@@ -134,7 +134,7 @@ tags: [Database]
 
 ### 一个数据库系统各个部分以及它们之间联系的图：
 
-![]()
+![1_5](/assets/img/2022-12-06-Database-System-Concepts/1_5.png)
 
 # 二. 关系数据库
 
@@ -223,7 +223,7 @@ tags: [Database]
 
 &emsp;&emsp;大学数据库的部分SQL数据定义：
 
-![]()
+![3_1](/assets/img/2022-12-06-Database-System-Concepts/3_1.png)
 
 &emsp;&emsp;SQL禁止破坏完整性约束的任何数据库更新。  
 &emsp;&emsp;命令 `drop table r;` 从数据库中删除关系 r。`alter table r add A D;` 为已有的关系 r 增加域为 D 的属性 A，关系 r 中所有元组在新属性 A 上的取值将被设为 null。命令 `alter table r drop A;` 从关系 r 中去掉属性 A。
