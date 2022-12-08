@@ -246,7 +246,7 @@ tags: [Database]
         from r1 natural join r2 natural join ... natural join rm
         where P;
 -- 更为一般地，from 子句可以为如下形式：
-        from E1，E2, ..., En
+        from E1, E2, ..., En
 -- 其中每个Ei可以是单个关系或一个包含自然连接的表达式。一个例子：
         select name, title
         from instructor natural join teaches, course
@@ -272,9 +272,9 @@ tags: [Database]
     - SQL 允许使用 not like 比较运算符搜寻不匹配项。
     - 在 SQL:1999 中提供了 similar to 操作，类似 UNIX 中的正则表达式。
 + 形如 `select * ` 的子句表示 from 子句结果关系中的所有属性都被选中。
-+ SQL 对关系中元组显示次序的控制，order by 子句让查询结果中元组按指定的属性列顺序显示，默认使用升序。可以用 desc 表示降序，asc 表示升序。排序可以在多个属性上进行。
++ SQL 提供对关系中元组显示次序的控制，order by 子句让查询结果中元组按指定的属性列顺序显示，默认使用升序。可以用 desc 表示降序，asc 表示升序。排序可以在多个属性上进行。
 + between and 比较运算符在 where 子句中说明一个值是小于或等于某个值，同时大于或等于另一个值的。类似地，还有 not between 比较运算符。
-+ where 子句中可以按元组运用比较运算符，按字典顺序进行比较运算。
++ where 子句中可以按元组形式运用比较运算符，按字典顺序进行比较运算。
 
 #### d. 集合运算
 
@@ -284,13 +284,13 @@ tags: [Database]
 
 + 如果算术表达式的任一输入为空，则该算术表达式（+、-、*或/）结果为空。
 + SQL 将涉及空值的任何比较运算的结果视为 unknown（既不是谓词 is null，也不是 is not null），这创建了除 true 和 false 之外的第三个逻辑值。
-+ and、or 和 not 也可以处理 unknown 值：
++ and、or 和 not 也可以处理 unknown 值（遇到 unknown 为 unknown，短路则为短路值）：
     - and: true and unknown == unknown; false and unknown == false; unknown and unknown == unknown
     - or: true or unknown == true; false or unknown == unknown; unknown or unknown == unknown
     - not: not unknown == unknown
 + SQL 在谓词中使用特殊的关键词 null 测试空值（is null 以及 is not null）。
 + 某些 SQL 实现允许使用 is unknown 和 is not unknown 测试一个表达式的结果是否为 unknown ，而不是 true 或 false。
-+ 如果元组在所有属性上的取值相等，即使某些值为空，它们就被当作相同元组。谓词中 null=null 会返回 unknown，其他情况（比如 distinct 以及集合的并、交和差运算）可以当作 true 看待。
++ 如果元组在所有属性上的取值相等，即使某些相等的值同时为空，它们也被当作相同元组。因为只有在谓词中 null=null 会返回 unknown，其他需要比较的情况（比如 distinct 以及集合的并、交和差运算）可以当作相等，也就是结果为 true 看待。
 
 #### f. 聚集函数
 
@@ -367,11 +367,11 @@ tags: [Database]
     ```
     
     - exists 测试在作为参数的子查询结果中是否存在元组；not exists 测试子查询结果集中是否不存在元组。满足相应条件时，返回 true。
-    - unique 测试在作为参数的子查询结果中是否存在重复元组。not unique 测试在子查询结果集中是否存在不存在重复元组。
+    - unique 测试在作为参数的子查询结果中是否存在重复元组。not unique 测试在子查询结果集中是否不存在重复元组。满足相应条件时，返回 true。
 + SQL 允许在 from 子句中使用子查询表达式。因为子查询表达式返回的结果都是关系。可以用 as 子句给子查询的结果关系起个名字，并对属性进行重命名。在 from 子句的子查询用关键字 lateral 作为前缀可以访问 from 子句中在它前面的表或子查询中的属性。
 
     ```sql
-    -- 找出系平均工资超过42000美元的那些系中教师的平均工资：
+    -- 找出系平均工资超过42000美元的那些系的教师平均工资：
             select dept_name, avg_salary
             from (select dept_name, avg(salary) as avg_salary
                   from instructor
@@ -400,7 +400,7 @@ tags: [Database]
             select budget
             from department, max_budget
             where department.budget = max_budget.value;
-    -- 查找所有工资总额大于等于所有系平均工资总额的系：
+    -- 查找工资总额大于等于所有系平均工资总额的系：
             with dept_total (dept_name, value) as
                 (select dept_name, sum(salary)
                  from instructor
@@ -448,7 +448,8 @@ tags: [Database]
             delete from instructor
             where salary < (select avg(salary)
                             from instructor);
-    -- 在执行任何删除前会先进行每一个元组的测试检查，然后删除符合条件的元组，从而以防结果依赖于元组被处理的顺序。
+    -- 在执行任何删除前都会先进行每一个元组的是否删除的谓词测试检查，
+    -- 然后再是删除每一个符合条件的元组，从而以防结果依赖于元组被处理的顺序。
     ```
 
 + 插入
@@ -521,4 +522,78 @@ tags: [Database]
 
 ## 3. 中级 SQL
 
+### （1）连接表达式
+
+#### a. 连接条件
+&emsp;&emsp;join ... using 子句是一种自然连接的形式，需要在指定属性上的取值匹配。SQL 支持指定任意的连接条件，on 条件允许在参与连接的关系上设置通用的谓词，在写法上与 where 子句类似。与 using 条件一样，on 条件出现在连接表达式的末尾。  
+&emsp;&emsp;注意，在自然连接的结果关系中，共有属性只会出现在结果关系中一次，而笛卡儿积的结果尽管指定了 where 条件或 on 条件，共有属性也会在结果中出现两次。
+
+```sql
+            select * from student join takes on student.ID = takes.ID;
+            -- 等价于：
+            select * from student, takes where student.ID = takes.ID;
+            -- 结果中，ID 属性出现两次，分别表示为 student.ID, takes.ID
+            -- 只显示一次 ID 值：
+            select student.ID as ID, name, dept_name, tot_cred, course_id,
+                sec_id, semester, year, grade
+            from student join takes on student.ID = takes.ID;
+```
+
+&emsp;&emsp;on 条件可以表示任何 SQL 谓词，从而使用 on 条件的连接表达式就可以表示比自然连接更为丰富的连接条件。on 子句中的谓词可以移到 where 子句中，但在被称作外连接的这类连接中 on 条件的表现与 where 条件是不同的。通常，在 on 子句中指定连接条件，而在 where 子句中指定其余条件，这样的 SQL 查询更容易让人读懂。
+
+#### b. 外连接
+
+&emsp;&emsp;在自然连接中的两个关系中，没有匹配的元组将不会出现在结果关系中。因此，在参与连接的任何一个或两个关系中的某些元组可能会因无匹配而丢失。外连接（outer join）运算通过在结果中创建包含空值元组的方式，保留了那些在连接中丢失（无匹配）的元组。实际上有三种形式的外连接：
+
++ 左外连接（left outer join）只保留出现在左外连接运算之前（左边）的关系中的元组，这些元组的右边关系属性被赋为空值。
++ 右外连接（right outer join）只保留出现在右外连接运算之后（右边）的关系中的元组，这些元组的左边关系属性被赋为空值。
++ 全外连接（full outer join）保留出现在两个关系中的元组，这些元组无匹配的关系属性被赋为空值。
+
+&emsp;&emsp;为了与外连接运算相区分，此前的**不保留未匹配元组**的连接运算被称作内连接（inner join）运算。
+
+```sql
+            select * from student natural left outer join takes;
+            -- 左外连接和右外连接是对称的：
+            select * from takes natural right outer join student;
+            -- 这两个的结果是一样的，只是结果中属性出现的顺序不同。
+
+            -- 显示 Comp.Sci. 系的所有学生和他们在2009年春季的选修的所有课程段列表，为选秀的课程也显示出来
+            select * from (select * 
+                           from student 
+                           where dept_name = 'Comp.Sci.')
+                     natural full outer join
+                        (select *
+                         from takes
+                         where semester = 'Spring' and year = 2009);
+```
+
+&emsp;&emsp;on 子句可以和外连接一起使用。on 是连接条件，作用于连接过程，产生 from 的结果集。where 是作用于 from 结果集的谓词。
+
+```sql
+            select *
+            from student left outer join takes on student.ID = takes.ID;
+            -- student 中无匹配的元组会出现在结果集中。
+            -- 在生成笛卡儿积的过程中，on 条件因 takes.ID 不存在不满足时，左外连接加入空元组。
+            select *
+            from student left outer join takes on true
+            where student.ID = takes.ID;
+            -- student 中无匹配的元组不会出现在结果集中。
+            -- 在生成笛卡儿积的过程中，on 条件一直满足，生成了完整的笛卡儿积，
+            -- 在 where 谓词筛选时，不满足的元组被排除，包括 student 中的无匹配的那些笛卡儿积结果。
+
+```
+
+#### c. 连接类型和条件
+&emsp;&emsp;SQL 中把常规连接称作内连接，关键字 inner 是可选的，没有 outer 前缀的 join 默认是 inner join。  
+&emsp;&emsp;任意的连接类型（内连接、左外连接、右外连接、全外连接）可以和任意的连接条件（自然连接、using 条件连接或 on 条件连接）进行组合：
+
+![4_6](/assets/img/2022-12-06-Database-System-Concepts/4_6.png)
+
+### （2）视图
+
+
+### （3）事务
+
+
 ## 4. 高级 SQL
+
