@@ -591,9 +591,141 @@ tags: [Database]
 
 ### （2）视图
 
+&emsp;&emsp;让所有用户都看到整个逻辑模型是不合适的，有时我们还希望创建一个比逻辑模型更符合特定用户的直觉的个人化的关系集合。SQL 允许通过查询定义“虚关系”，它在概念上包含查询的结果，但并不预先计算并存储，而是在使用虚关系的时候才通过执行查询被计算出来。任何像这种不是逻辑模型的一部分，但作为虚关系对用户可见的关系称为**视图（view）**。在任何给定的实际关系集合上能够支持大量视图。
+
+#### 视图定义：
+
+```sql
+            create view v as <query expression>;
+        -- v 是视图名称，<query expression> 是计算视图的查询，可以是任何合法的查询表达式。
+
+            create view faculty as
+            select ID, name, dept_name
+            from instructor;
+
+            create view physics_fall_2009 as
+            select course.course_id, sec_id, buiding, room_number
+            from course, section
+            where course.course_id = section.course_id
+                and course.dept_name = 'Physics'
+                and section.semester = 'Fall'
+                and section.year = 2009;
+```
+
+&emsp;&emsp;视图关系在概念上包含查询结果中的元组，但并不进行预计算和存储。数据库系统存储与视图关系相关联的查询表达式，当视图关系被访问时，其中的元组才被计算出来。即，视图关系是在需要的时候才被创建的。
+
+#### SQL 查询中使用视图
+
+```sql
+        -- 在查询中，视图名可以出现在关系名可以出现的任何地方：
+            select course_id
+            from physics_fall_2009
+            where buiding = 'Wastson';
+        -- 视图的属性名可以按下述方式显式指定：
+            create view departments_total_salary(dept_name, total_salary) as
+                select dept_name, sum(salary)
+                from instructor
+                group by dept_name;
+        -- 一个视图可以被用到定义另一个视图的表达式中：
+            create view physics_fall_2009_watson as
+                select course_id, room_number
+                from physics_fall_2009
+                where buiding = 'Watson';
+```
+
+#### 物化视图
+
+&emsp;&emsp;特定数据库系统允许存储视图关系，但它们保证当定义视图的实际关系改变，视图也跟着修改。这样的视图被称为**物化视图（materialized view）**。保持物化视图一直在最新状态的过程称为**物化视图维护（materialized view maintenance）**，或者通常简称**视图维护（view maintenance)**。物化视图查询带来了许多好处，但是也需要与存储代价和更新开销相权衡。
+
+#### 视图更新
+
+&emsp;&emsp;用视图表达的数据库修改必须被翻译为对数据库逻辑模型中实际关系的修改。因此，除了一些有限的情况外，一般不允许对视图关系进行修改。不同的数据库系统指定了不同的条件以允许更新视图关系。一般来说，SQL 视图是可更新的（updatable），即在视图上可以执行插入、更新或删除，需满足下列条件：
++ from 子句中只有一个数据库关系。
++ select 子句中只包含关系的属性名，不包含任何表达式、聚集或 distinct 声明。
++ 任何没有出现在 select 子句中的属性可以取空值，即没有 not null 约束，也不构成主码的一部分。
++ 查询中不含有 group by 或 having 子句。
+
+```sql
+            create view history_instructors as
+            select *
+            from instructor
+            where dept_name = 'History';
+        -- 可以在视图定义的末尾包含 with check option 子句，
+        -- 表明像视图插入/更新一条不满足视图的where子句条件的元组时，数据库将拒绝操作。
+        -- 比如向上面的视图插入元组 ('25566', 'Brown', 'Biology', 100000)。
+```
 
 ### （3）事务
 
+&emsp;&emsp;事务（transaction）由查询和（或）更新语句的序列组成。SQL 标准规定当一条 SQL 语句被执行，就隐式开启了一个事务。下列 SQL 语句之一会结束一个事务：
++ Commit work ：提交当前事务，将该事务所做的更新在数据库中持久保存。在事务被提交后，一个新的事务自动开始。
++ Rollback work ：回滚当前事务，撤销该事务中所有 SQL 语句对数据库的更新。
+
+&emsp;&emsp;关键字 work 在两条语句中都是可选的。一旦某事务执行了 commit work ，它的影响就不能用 rollback work 来撤销了。数据库系统保证在发生诸如某条 SQL 语句错误、断电、系统崩溃这些故障的情况下，影响将被回滚。在断电和系统崩溃的情况下，回滚会在系统重启后执行。  
+&emsp;&emsp;一个事务或者在完成所有步骤后提交其行为，或者在不能成功完成其所有动作的情况下回滚其所有动作，通过这种方式数据库提供了对事物具有原子性的抽象，原子性也就是不可分割性。  
+&emsp;&emsp;在很多 SQL 实现中，默认方式下每个 SQL 语句自成一个事务，且一执行完就提交。可以关闭单独 SQL 语句的自动提交，从而执行多条SQL语句。作为 SQL:1999 的一部分，允许多条 SQL 语句包含在关键字 begin atomic ... end 之间，所有在关键字之间的语句构成了一个单一事务。
+
+### （4）完整性约束
+
+&emsp;&emsp;完整性约束保证授权用户对数据库所做的修改不会破坏数据的一致性，防止对数据的意外破坏。完整性约束可以是属于数据库的任意谓词（需极小开销的），通常被看成是数据库模式设计过程的一部分，它作为用于创建关系的 create table 命令的一部分被声明。也可以通过使用 alter table *table-name* add *constraint* 命令施加到已有关系上，constraint 可以是关系上的任意约束，前提是关系满足指定的约束。
+
+create table 命令允许的完整性约束包括：
++ `not null` 。空值是所有域的成员，因此默认情况下是每个属性的合法值。可以通过 not null 声明限定属性的域排除空值，从而禁止在该属性上插入空值。SQL 禁止在关系模式的主码中出现空值，因此主码属性默认声明了 not null 。
++ `unique (Aj1, Aj2, ..., Ajm)` 。unique 声明指出属性 Aji,Aj2,...,Ajm 形成了一个候选码，即在关系中没有两个元组能在所有列出的属性上取值相同。然而不同于主码，候选码的属性可以为 null，因此 unique 不会默认声明 not null。空值不等于其他的任何值。
++ `check(<谓词>)` 。check(P) 子句指定一个谓词 P，关系中的每个元组都必须满足谓词 P。通常用 check 子句来保证属性值满足指定的条件，实际上创建了一个强大的类型系统。
++ 参照完整性。不同于外码约束，参照完整性约束通常不要求 referencing relation 中的属性集 K1 是 referenced relation 的主码，其结果是 referenced relation 中可能有不止一个元组在属性 K1 上取值相同。references 子句显式指定 referenced 关系的属性列表，这个指定的属性列表必须声明为 referenced relation 的候选码，要么使用 primary key 约束，要么使用 unique 约束。SQL 也提供了另外的结构用于实现被参照关系的被参照属性不必是候选码的形式。
+
+    ```sql
+            -- 一种作为属性定义的一部分声明为外码的简写形式：
+                create table course (
+                    dept_name varchar(20) references department,
+                    ...
+                );
+            -- 当被参照关系上的删除或更新动作违反了约束，
+            -- 可指明系统采取一些步骤修改参照关系中的元组来恢复完整性约束，而不是拒绝这样的动作：
+                create table course (...
+                    foreign key (dept_name) references department
+                        on delete cascade
+                        on update cascade,
+                ...);
+    ```
+
+    - `on delete cascade` 子句，对参照关系做“级联”删除，即删除参照了被删除系的元组。
+    - `on update cascade` 子句，对参照关系做“级联”更新，即更新参照了被更新系的元组的系名。
+    - `on delete set null` (`on update set null`) 子句，将参照域置为 null。
+    - `on delete set default` ，将参照域置为默认值。
+    - 如果存在设计多个关系的外码依赖链，则在链一端所做的删除或更新可能传至整个链。
+    - 如果一个级联更新或删除导致的对约束的违反不能通过进一步的级联操作解决，则系统中止该事务。
+
+ + 大学数据库的部分SQL数据定义：
+
+    ![4_8](/assets/img/2022-12-06-Database-System-Concepts/4_8.png)
+
+#### 事务中对完整性约束的违反
+
+&emsp;&emsp;SQL 标准允许将 initially deferred 子句加入到约束声明中，使这种完整性约束在事务结束时检查，而不是在事务的中间步骤上检查。一个约束在默认方式下是立即检查约束。对于声明为可延迟的约束，执行 set constraints *constraint-list* deferred 语句作为事务的一部分，会导致对指定约束的检查被延迟到该事务结束时执行。
+
+#### 复杂 check 条件与断言
+
+```sql
+        -- check 子句中的谓词可以是包含子查询的任意谓词。
+            check (time_slot_id in select time_slot_id from time_slot)
+        -- SQL 中的断言为如下形式：
+            create assertion <assertion-name> check <predicate>;
+        -- 一个断言例子：
+        -- 对于 student 关系的每个元组在 tot_cred 上的取值必须等于该生成功修完课程的学分总和：
+            create assertion credits_earned_constraint check
+                (not exists (select ID
+                            from student
+                            where tot_cread <> (select sum(credits) 
+                                                from takes natural join course
+                                                where student.ID = takes.ID
+                                                and grade is not null and grad <> 'F')));
+```
+
+### （5）SQL 的数据类型与模式
+
+### （6）授权
 
 ## 4. 高级 SQL
 
