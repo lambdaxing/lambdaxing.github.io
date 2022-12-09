@@ -557,7 +557,7 @@ tags: [Database]
             select * from takes natural right outer join student;
             -- 这两个的结果是一样的，只是结果中属性出现的顺序不同。
 
-            -- 显示 Comp.Sci. 系的所有学生和他们在2009年春季的选修的所有课程段列表，为选秀的课程也显示出来
+            -- 显示 Comp.Sci. 系的所有学生和他们在2009年春季的选修的所有课程段列表，未选修的课程也显示出来
             select * from (select * 
                            from student 
                            where dept_name = 'Comp.Sci.')
@@ -593,7 +593,7 @@ tags: [Database]
 
 &emsp;&emsp;让所有用户都看到整个逻辑模型是不合适的，有时我们还希望创建一个比逻辑模型更符合特定用户的直觉的个人化的关系集合。SQL 允许通过查询定义“虚关系”，它在概念上包含查询的结果，但并不预先计算并存储，而是在使用虚关系的时候才通过执行查询被计算出来。任何像这种不是逻辑模型的一部分，但作为虚关系对用户可见的关系称为**视图（view）**。在任何给定的实际关系集合上能够支持大量视图。
 
-#### 视图定义：
+#### a. 视图定义：
 
 ```sql
             create view v as <query expression>;
@@ -614,7 +614,7 @@ tags: [Database]
 
 &emsp;&emsp;视图关系在概念上包含查询结果中的元组，但并不进行预计算和存储。数据库系统存储与视图关系相关联的查询表达式，当视图关系被访问时，其中的元组才被计算出来。即，视图关系是在需要的时候才被创建的。
 
-#### SQL 查询中使用视图
+#### b. SQL 查询中使用视图
 
 ```sql
         -- 在查询中，视图名可以出现在关系名可以出现的任何地方：
@@ -633,11 +633,11 @@ tags: [Database]
                 where buiding = 'Watson';
 ```
 
-#### 物化视图
+#### c. 物化视图
 
 &emsp;&emsp;特定数据库系统允许存储视图关系，但它们保证当定义视图的实际关系改变，视图也跟着修改。这样的视图被称为**物化视图（materialized view）**。保持物化视图一直在最新状态的过程称为**物化视图维护（materialized view maintenance）**，或者通常简称**视图维护（view maintenance)**。物化视图查询带来了许多好处，但是也需要与存储代价和更新开销相权衡。
 
-#### 视图更新
+#### d. 视图更新
 
 &emsp;&emsp;用视图表达的数据库修改必须被翻译为对数据库逻辑模型中实际关系的修改。因此，除了一些有限的情况外，一般不允许对视图关系进行修改。不同的数据库系统指定了不同的条件以允许更新视图关系。一般来说，SQL 视图是可更新的（updatable），即在视图上可以执行插入、更新或删除，需满足下列条件：
 + from 子句中只有一个数据库关系。
@@ -651,7 +651,7 @@ tags: [Database]
             from instructor
             where dept_name = 'History';
         -- 可以在视图定义的末尾包含 with check option 子句，
-        -- 表明像视图插入/更新一条不满足视图的where子句条件的元组时，数据库将拒绝操作。
+        -- 表明向视图插入/更新一条不满足视图的where子句条件的元组时，数据库将拒绝操作。
         -- 比如向上面的视图插入元组 ('25566', 'Brown', 'Biology', 100000)。
 ```
 
@@ -662,7 +662,7 @@ tags: [Database]
 + Rollback work ：回滚当前事务，撤销该事务中所有 SQL 语句对数据库的更新。
 
 &emsp;&emsp;关键字 work 在两条语句中都是可选的。一旦某事务执行了 commit work ，它的影响就不能用 rollback work 来撤销了。数据库系统保证在发生诸如某条 SQL 语句错误、断电、系统崩溃这些故障的情况下，影响将被回滚。在断电和系统崩溃的情况下，回滚会在系统重启后执行。  
-&emsp;&emsp;一个事务或者在完成所有步骤后提交其行为，或者在不能成功完成其所有动作的情况下回滚其所有动作，通过这种方式数据库提供了对事物具有原子性的抽象，原子性也就是不可分割性。  
+&emsp;&emsp;一个事务或者在完成所有步骤后提交其行为，或者在不能成功完成其所有动作的情况下回滚其所有动作，通过这种方式数据库提供了对事务具有原子性的抽象，原子性也就是不可分割性。  
 &emsp;&emsp;在很多 SQL 实现中，默认方式下每个 SQL 语句自成一个事务，且一执行完就提交。可以关闭单独 SQL 语句的自动提交，从而执行多条SQL语句。作为 SQL:1999 的一部分，允许多条 SQL 语句包含在关键字 begin atomic ... end 之间，所有在关键字之间的语句构成了一个单一事务。
 
 ### （4）完整性约束
@@ -707,12 +707,17 @@ create table 命令允许的完整性约束包括：
 
 #### 复杂 check 条件与断言
 
+&emsp;&emsp;SQL 标准所支持的另外一些用于声明完整性约束的结构：
+
 ```sql
         -- check 子句中的谓词可以是包含子查询的任意谓词。
             check (time_slot_id in select time_slot_id from time_slot)
+        -- 在 time_slot 关系改变时，该约束也需要检查。
+
+        -- 一个断言就是一个谓词，它表达了我们希望数据库总能满足的一个条件。域约束和参照完整性是断言的特殊形式。
         -- SQL 中的断言为如下形式：
             create assertion <assertion-name> check <predicate>;
-        -- 一个断言例子：
+        -- 一个用 SQL 断言写出的约束示例：
         -- 对于 student 关系的每个元组在 tot_cred 上的取值必须等于该生成功修完课程的学分总和：
             create assertion credits_earned_constraint check
                 (not exists (select ID
@@ -723,9 +728,214 @@ create table 命令允许的完整性约束包括：
                                                 and grade is not null and grad <> 'F')));
 ```
 
+&emsp;&emsp;当创建断言时，系统要检测其有效性。有效的断言只有不破坏断言的数据库修改才会被允许。复杂的断言会带来相当大的开销。数据库系统的触发器可以实现等价的功能。
+
 ### （5）SQL 的数据类型与模式
 
+#### a. SQL 标准支持的与日期和时间相关的几种类型：
++ date ：日历日期，包括年（四位）、月和日。
++ time ：一天中的时间，包括小时、分和秒。time(p) 表示秒的小数点后的数字位数（默认为0）。time with timezone 把时区信息联通时间一起存储。
++ timestamp :date 和 time 的组合。timestamp(p) 同上（默认值为6），with timezone 同上。
+
+```sql
+    -- 日期和时间类型的值可按如下方式说明：
+            date '2001-04-25'
+            time '09:30:00'
+            timestamp '2001-04-25 10:29:01.45'
+    -- 可以利用 cast e as t 形式的表达式将一个字符串 e 转换成类型 t，其中 t 可以是 date、time、timestamp 中的一种。
+            cast ‘2001-04-25’ as date
+    -- 可以利用 extract(field from d) ，从 date 或 time 值 d 中提取出单独的域，
+    -- 这里的域可以是 year, month, day, hour, minute, second, timezone_hour, timezone_minute 中的一种。
+```
+
+&emsp;&emsp;SQL 定义的获取当前日期和时间的函数：
++ current_date 返回当前日期。
++ current_time 返回当前时间（带有时区）。
++ localtime 返回当前的本地时间（不带时区）。
++ current_timestamp（带有时区），localtimestamp（本地日期和时间，不带时区）返回时间戳。
+
+&emsp;&emsp;SQL 允许在上面的所有类型上运行比较运算，SQL 支持 interval 数据类型（时间间隔类型），允许在日期、时间和时间间隔上进行算术运算和比较运算。
+
+#### b. 默认值
+
+```sql
+    -- SQL 允许为属性指定默认值：
+            create table student
+             ( ID varchar(5),
+               name varchar(20) not null,
+               dept_name varchar(20),
+               tot_cred numeric(3, 0) default 0,
+               primary key (ID));
+```
+
+#### c. 创建索引
+
+&emsp;&emsp;在关系的属性上所创建的索引（index）是一种数据结构，它允许数据库系统高效地找到关系中那些在索引属性上取给定值的元组，而不用扫描关系中的所有元组。索引也可以建立在一个属性列表上。索引的实现包括一种被称作 B+ 树的索引，它是一种特别的、广泛使用的索引类型。如果用户提交的SQL查询可以从索引的使用中获益，那么SQL查询处理器就会自动使用索引，而不用读取整个关系。
+
+```sql
+    -- 很多数据库支持使用如下所示的语法形式来创建索引：
+            create index studentID_index on student(ID);
+    -- 上述语句在 student 关系的属性 ID 上创建了一个名为 studentID_index 的索引。
+```
+
+#### d. 大对象类型
+
+&emsp;&emsp;SQL 提供字符数据的大对象数据类型（clob）和二进制数据的大对象数据类型（blob），这些类型中的“lob“代表“Large OBject"。
+
+```sql
+        -- 我们可以声明属性：
+                book_review clob (10KB)
+                image blob (10MB)
+                movie blob (2GB)
+```
+
+&emsp;&emsp;一个应用通常用一个SQL查询来检索出一个大对象的“定位器”，然后在宿主语言中用这个定位器来操纵对象，应用本身也是用宿主语言书写的。这很像一个 read 函数调用从操作系统文件中读取数据。
+
+#### e. 用户定义的类型
+
+&emsp;&emsp;SQL 支持两种形式的用户定义数据类型。独特类型（distinct type）和结构化数据类型（structured data type，22 章介绍）。一个好的数据库应该有在概念层的类型系统，二不是仅有物理层的类型系统。因此，SQL 提供了独特类型的概念：
+
+```sql
+    -- 可以用 create type 子句来定义新类型：
+            create type Dollars as numeric (12, 2) final;
+            create type Pounds as numeric (12, 2) final;
+    -- 一些系统实现允许忽略 final 关键字。新创建的类型可以用作关系属性的类型。
+            create table department
+                (dept_name varchar(20),
+                 building varchar(15),
+                 budget Dollars);
+    -- 独特类型拥有强类型检查，不同类型之间的运算将导致编译错误。
+    -- 一种类型的值可以被转换到另一个域：
+            cast (department.budget to numeric(12, 2))
+    -- SQL 提供了 drop type 和 alter type 子句来删除或修改以前创建过的类型。
+
+    -- SQL 还有一个与独特类型相似但稍有不同的概念：域（domain）。
+            create domain DDollars as numeric(12, 2) not null;
+    -- 然而，类型和域有两个重大的差别：
+    -- 1. 在域上可以声明约束，例如 not null，也可以为域类型变量定义默认值。
+    -- 2. 域不是强类型。一个域类型的值可以被赋给另一个域类型，只要它们的基本类型是相容的。
+    -- check 子句也能应用到域上，指定一个谓词，来自该域的任何变量都必须满足这个谓词。
+            create domain YearlySalary numeric(8, 2)
+                constraint salary_value_test check(value >= 29000.00);
+    -- constraint salary_value_test 子句是可选的，用来给约束命名。
+```
+
+&emsp;&emsp;create type 和 create domain 结构是SQL标准的部分，并没被大多数数据库实现完全支持，且不同的数据库实现具有不同的语法和解释。
+
+#### f. create table 的扩展
+
+```sql
+    -- SQL 提供创建与现有某个表的模式相同的表的扩展：
+            create table temp_instructor like instructor;
+    
+    -- SQL 提供创建包含查询结果的表，即把查询的结果存储成一个新表：
+            create table t1 as
+                (select *
+                 from instructor
+                 where dept_name = 'Music')
+            with data;
+    -- 默认情况下，列的名称和数据类型都是从查询结果中推导出来的。
+    -- 在关系名后面列出列名，可以给列显式指定名字。 
+```
+
+&emsp;&emsp;省略 with data 子句会创建表，但不载入数据。几种数据库实现都用不同的语法支持 create table ... like 和 create table ... as 的功能。  
+&emsp;&emsp;create table ... as 语句与 create view 语句非常相似，都是用查询来定义，两者的区别在于视图与表的区别。
+
+#### g. 模式、目录与环境
+
+&emsp;&emsp;当代数据库系统提供了三层结构的关系命名机制。目录（catalog）、模式（schema）、关系/视图（SQL对象）。目录类似于操作系统的用户主（home）目录，也有另一术语名词“数据库“。  
+&emsp;&emsp;当一个用户连接到数据库时，该连接就设置为该用户的默认目录和模式。一个关系的名字形如 catalog5.univ_schema.course 包含三部分。  
+&emsp;&emsp;当有多个目录和模式可用时，不同的应用和不同的用户可以独立工作而不必担心命名冲突。默认目录和模式是为每个连接建立的SQL环境（SQL environment）的一部分，环境还包括用户标识（授权标识符）。通常所有的SQL语句（DDL和DML）都在一个模式的环境中运行。  
+&emsp;&emsp;可以用 create schema 和 drop schema 语句来创建和删除模式。
+
 ### （6）授权
+
+#### a. 权限的授予与收回：
+
+```sql
+    -- grant 语句用来授予权限：
+            grant <权限列表>
+            on <关系名或视图名>
+            to <用户/角色列表>
+    -- SQL 标准包括 select、insert、update 和 delete 权限。
+            grant select on department to Amit, Satoshi;
+            grant update (budget) on department to Amit, Satoshi;
+    -- 用户名 public 指系统的所有当前用户和将来的用户。
+    -- SQL 授权机制可以对整个关系或一个关系的指定属性授予权限，不允许对一个关系的指定元组授权。
+
+    -- revoke 语句用来收回权限：
+            revoke <权限列表>
+            on <关系名/视图名>
+            from <用户/角色列表>
+    -- 收回之前授予的权限：
+            revoke select on department from Amit, Satoshi;
+            revoke update (budget) on department from Amit, Satoshi;
+```
+
+#### b. 角色
+
+&emsp;&emsp;角色（role）的概念对应于人所具有的真实世界角色。在数据库中建立一个角色集，可以给角色授予权限就像给用户授权一样。每个数据库用户被授予一组他有权扮演的角色（也可能是空的）。
+
+```sql
+    -- 在 SQL 中创建角色：
+            create role instructor；
+    -- 给角色授权：
+            grant select on takes
+            to instructor;
+    -- 授予角色给用户或其他角色：
+            grant dean to Amit;
+            create role dean;
+            grant instructor to dean;
+            grant dean to Satoshi;
+```
+
+&emsp;&emsp;一个用户或一个角色的权限包括：
++ 所有直接授予用户/角色的权限。
++ 所有授予给用户/角色所拥有角色的权限。
+
+&emsp;&emsp;因此，可能存在着一个角色链。当一个用户登录到数据库系统时，在此会话中用户拥有所有直接授予他的权限，以及所有授予（直接或间接）该用户所拥有角色的权限。
+
+#### c. 视图的授权
+
+&emsp;&emsp;创建视图的用户在该视图上的权限是他在定义该视图的关系上所拥有的权限。
+
+#### d. 模式的授权
+
+&emsp;&emsp;只有数据库模式的拥有者才能够执行对模式的任何修改，诸如创建或删除关系，增加或删除关系的属性，以及增加或删除索引。SQL 提供了一种 references 权限，允许用户在创建关系时声明外码。
+
+```sql
+    -- 允许用户 Mariano 创建能够参照 department 关系的 dept_name 码的关系：
+            grant references(dept_name) on department to Mariano;
+```
+
+&emsp;&emsp;因为外码约束限制了被参照关系上的删除和更新操作，外码的定义限制了其他用户将来的行为，因此需要有 references 权限。同理，check 约束有参照某个关系的子查询时，也需要被参照关系的 references 权限，因为参照了另一个关系的 check 约束限制了对该关系可能的更新。
+
+#### d. 权限的转移
+
+&emsp;&emsp;在相应的 grant 命令后面附加 with grant option 子句，可以在授权时允许接受者把得到的权限再传递给其他用户。
+
+```sql
+    -- 授予 Amit 在 department 上的 select 权限，并允许 Amit 将该权限授予给其他用户 
+            grant select on department to Amit with grant option;
+```
+
+&emsp;&emsp;一个对象（关系/视图/角色）的创建者拥有该对象上的所有权限，包括给其他用户授权的权限。指定权限从一个用户到另一个用户的传递可以被表示为授权图（authorization graph），用户具有权限的充分必要条件是：当且仅当存在从授权图的根（即代表数据库管理员的顶点）到代表该用户顶点的路径。
+
+![4_10](/assets/img/2022-12-06-Database-System-Concepts/4_10.png)
+
+#### e. 权限的收回
+
+&emsp;&emsp;从一个用户/角色那里收回权限可能导致其他用户/角色也失去该权限，这一行为称为级联收回。即当一个用户/角色的权限被收回时，这个用户/角色授予给了同一权限的其他用户/角色的这一权限也会被收回。
+
+```sql
+    -- revode 语句可以声明 restrict 来防止级联收回：
+            revoke select on department from Amit, Satoshi restrict;
+    -- 这种情况下，如果存在任何级联收回，系统就会返回错误，且不执行收权动作。
+    -- 收回 grant option 权限（授权他人的权限），而不收回 select 权限：
+            revoke grant option for select on department from Amit;
+```
+
+&emsp;&emsp;级联收回在许多情况下是不合适的。因此，SQL 允许权限由一个角色授予，而不是由用户来授予。默认情况下，当前会话有一个关联的当前角色，默认是空的，可以通过执行 set role role_name 来设置，指定的角色必须已经授予给用户。在授予权限时，可以将授权人设置为会话所关联的当前角色，且当前角色不为空，需要在授权语句后面加上 granted by current_role 子句。这样从当前用户出收回（当前）角色/权限就不会导致收回当前用户以当前角色作为授权人 所授予的权限，即使当前用户是执行该授权的用户。
 
 ## 4. 高级 SQL
 
