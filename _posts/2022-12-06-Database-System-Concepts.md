@@ -941,3 +941,245 @@ create table 命令允许的完整性约束包括：
 
 ## 4. 高级 SQL
 
+### （1）使用程序设计语言访问数据库
+
++ 动态SQL。
+    - JDBC。
+    - ODBC。
++ 嵌入式SQL。
+
+### （2）函数和过程
+
+&emsp;&emsp;开发者可以编写自己的函数和过程存储在数据库里并在SQL语句中调用。函数和过程允许“业务逻辑”作为存储过程记录在数据库中，并在数据库中执行。尽管有些业务逻辑能够被写成程序设计语言过程并完全存储在数据库以外，但把它们定义成数据库中的存储过程也有很多优点，比如多应用访问、耦合性增强等。  
+&emsp;&emsp;SQL 允许通过其有关过程的组件或外部的程序设计语言来定义函数、过程和方法。
+
+#### a. 声明和调用 SQL 函数和过程
+
+```sql
+    -- 声明一个函数：给定一个系的名字，返回该系的教师数目：
+            create function dept_count(dept_name varchar(20))
+                return integer
+                begin
+                declare d_count integer;
+                    select count(*) into d_count
+                    from instructor
+                    where instructor.dept_name = dept_name
+                return d_count;
+                end;
+    -- 使用 create or replace 而不是 create，对旧的函数进行替换。
+    -- 调用一个函数：查询教师数大于 12 的所有系的名字和预算：
+            select dept_name, budget
+            from department
+            where dept_count(dept_name) > 12;
+```
+
+&emsp;&emsp; SQL 支持返回关系作为结果的函数，这种函数称为表函数（table function）。表函数通常被看作**带参数的视图（parameterized view）**，它允许通过参数把视图的概念更加一般化。
+
+```sql
+    -- 声明一个函数：给定一个系的名字，返回这个系的所有教师信息的表：
+            create function instructor_of(dept_name varchar(20))
+                return table (
+                    ID varchar(5),
+                    name varchar(20),
+                    dept_name varchar(20),
+                    salary numeric(8, 2)
+                )
+            return table (
+                select ID, name, dept_name, salary
+                from instructor
+                where instructor.dept_name = instructor_of.dept_name
+            );
+    -- 注意，在使用函数的参数时，需要加上函数名作为前缀，即上面的 instructor_of.dept_name
+    -- 调用一个函数：查询金融系的所有教师：
+            select * 
+            from table (instructor_of('Finance'));
+
+    -- SQL也支持过程：
+            create procedure dept_count_proc(in dept_name varchar(20), out d_count integer)
+                begin
+                    select count(*) into d_count
+                    from instructor
+                    where instructor.dept_name = dept_count_proc.dept_name;
+                end
+    -- 关键字 in 和 end 分别表示待赋值的参数和为返回结果而在过程中设置值的参数。
+    -- 可以从一个SQL过程中或者从嵌入式SQL中使用call语句调用过程：
+            declare d_count integer;
+            call dept_count_proc('Physics', d_count);
+    -- SQL 的过程也支持同名，只要同名过程的参数个数不同。名称和参数个数用于标识一个过程。
+    -- SQL 的函数也支持同名，只要同名函数的参数个数不同，或者对于相同参数个数的函数，至少有一个参数的类型不同。
+```
+
+#### b. 支持过程和函数的语言构造
+
+&emsp;&emsp;SQL 所支持的过程和函数的语言构造被赋予了与通用程序设计语言相当的几乎所有功能。SQL 标准中处理这些构造的部分称为持久存储模块（Persistent Storage Module，PSM）。  
+&emsp;&emsp;变量通过 declare 语句声明为任意合法的SQL类型，set 语句赋值。  
+&emsp;&emsp;一个复合语句有 begin...end 的形式，在begin和end之间会包含复杂的SQL语句。可以在复合语句中声明局部变量。begin atomic ... end 的复合语句可以确保其中包含的所有语句作为单一的事务来执行。
+
+```sql
+    -- SQL 支持 while 和 repeat 语句：
+            while <布尔表达式> do
+                <语句序列>;
+            end while
+            repeat
+                <语句序列>;
+            until <布尔表达式>
+            end repeat
+    -- for 循环，它允许对查询的所有结果重复执行：
+            declare n integer default 0;
+            for r as
+                    select budget from department
+                    where dept_name = 'Music'
+            do
+                set n = n - r.budget
+            end for
+    -- 程序每次获取查询结果的一行，并存入for循环变量（r）中。
+    -- 语句 leave 可用来退出循环，
+    -- 而 iterate 表示跳过剩余语句从循环的开始进入下一个元组。
+
+    -- SQL 支持的条件语句 if-then-else 语句：
+            if <布尔表达式>
+                then <语句或复合语句>
+            elseif <布尔表达式>
+                then <语句或复合语句>
+            else <语句或复合语句>
+            endif
+    -- SQL 支持发信号通知异常条件（exception condition），以及声明句柄（handler）来处理异常：
+            declare out_of_classroom_seats condition
+            declare exit handler for out_of_classroom_seats
+            begin
+            <语句序列>
+            end
+    -- 在 begin 和 end 之间可以执行 signal out_of_classroom_seats 来引发一个异常。
+    -- 第二句句柄的 exit 说明将会采取动作终止 begin end 中的语句。
+    -- exit 的另一可选动作是 continue，它继续从异常语句的下一条语句开始执行。
+    -- 除了明确定义的条件（out_of_classroom_seats），
+    -- 还有一些预定义的条件：sqlexception、sqlwarning、not found。
+```
+
+&emsp;&emsp;一个有关SQL的过程化结构的大型例子：
+
+![5-7](/assets/img/2022-12-06-Database-System-Concepts/5_7.png)
+
+#### c. 外部语言过程
+
+&emsp;&emsp;SQL 的过程化扩展并不被标准的方法所支持，不同的数据库产品都可能有不同的语法和语义。但是，SQL 允许在外部用一种程序设计语言定义函数或过程，然后从SQL查询和触发器的定义中来调用它。  
+
+```sql
+    -- 外部过程和函数可以这样指定：
+            create procedure dept_count_proc(in dept_name varchar(20), 
+                                             out count integer)
+            language C
+            external name '/usr/avi/bin/dept_count_proc'
+            create function dept_count(dept_name varchar(20))
+            return integer
+            language C
+            external name '/usr/avi/bin/dept_count'
+```
+
+### （3）触发器
+
+&emsp;&emsp;触发器（trigger）是一条当数据库作修改时系统自动执行的语句。设置触发器机制的要求：
++ 指明执行触发器的条件。
+    - 一个引起触发器被检测的事件
+    + 一个触发器执行必须满足的条件
++ 指明触发器执行时的动作。
+
+&emsp;&emsp;触发器可以用来实现未被SQL约束机制指定的某些完整性约束，以及当满足特定条件时对用户发警报或自动开始执行某项任务。但是，触发器系统通常不能执行数据库以外的更新。
+
+#### a. SQL 中的触发器
+
+```sql
+    -- 使用触发器确保关系section中属性time_slot_id的参照完整性：
+            create trigger timeslot_check1 after insert on section
+                referencing new row as nrow
+                for each row
+                when (nrow.time_slot_id not in (
+                        select time_slot_id
+                        from time_slot))    -- time_slot 中不存在该 time_slot_id
+                begin
+                    rollback
+                end;
+                create trigger timeslot_check2 after delete on time_slot
+                referencing old row as orow
+                for each row
+                when(orow.time_slot_id not in ( 
+                        select time_slot_id
+                        from time_slot)         -- 在 time_slot 中刚刚被删除的 time_slot_id
+                and orow.time_slot_id in (
+                        select time_slot_id
+                        from section))          -- 在 section 仍含有该 time_slot_id 的引用
+                begin
+                    rollback
+                end;
+    -- 为了保证参照完整性，还必须为处理 section 和 time_slot 的更新来创建触发器。
+            create trigger timeslot_check3 after update of section on (time_slot_id)
+                referencing new row as nrow
+                for each row
+                when (nrow.time_slot_id not in (
+                        select time_slot_id
+                        from time_slot))
+                begin
+                    rollback
+                end;
+            create trigger timeslot_check4 after update of time_slot on (time_slot_id)
+                referencing old row as orow
+                for each row
+                when(orow.time_slot_id not in (
+                        select time_slot+id
+                        from time_slot)
+                and orow.time_slot_id in (
+                        select time_slot_id
+                        from section))
+                begin
+                    rollback
+                end;
+    -- 使用触发器维护 student 里元组的 tot_cred 属性，使其保持实时更新：
+            create trigger credits_earned after update of takes on (grade)
+                referencing new row as nrow
+                referencing old row as orow
+                for each row
+                when nrow.grade <> 'F' and nrow.grade is not null
+                    and (orow.grade = 'F' or orow.grade is null)
+                begin atomic
+                    update student
+                    set tot_cred = tot_cred + 
+                        (select credits
+                         from course
+                         where course.course_id = nrow.course_id)
+                    where student.id = nrow.id;
+                end;
+```
+
+&emsp;&emsp;许多数据库支持各种别的触发器事件。比如用户登录到数据库，或者当系统停止时，或者当系统设置改变的时候。
+
+```sql
+    -- 触发器可以在事件（insert、delete、update）之前激发：
+    -- 插入分数值为空白时，用 null 代替：
+            create trigger setnull before update of takes
+                referencing new row as nrow
+                for each row
+                when (nrow.grade = ' ')
+                begin atomic
+                    set nrow.grade = null;
+                end;
+```
+
+&emsp;&emsp;可以对引起插入、删除或更新的SQL语句执行单一动作，而不是对每个被影响的行执行一个动作。只需用 for each statement 子句替代 for each row 子句。可以用子句 referencing old table as 或 referencing new table as 来指向包含所有被影响的行的临时表（成为过渡表）。过渡表不能用于 before 触发器，但是可以用于 after 触发器，无论它们是语句触发还是行触发。  
+&emsp;&emsp;触发器可以被设为有效或者无效。命令 alter trigger *trigger_name* disable（disable trigger *trigger_name*）设为无效。命令 drop trigger *trigger_name* 丢弃触发器。  
+&emsp;&emsp;每个数据库系统都实现了自己的触发器语法，导致彼此不能兼容。这儿记录的是 SQL:1999 的触发器语法。
+
+#### b. 何时不用触发器
+
++ 外码约束的 on delete cascade 特性无需触发器来替代。
++ 物化视图无需触发器来维护，数据库系统支持自动维护。
++ 触发器无需用来复制或备份数据库。现代的数据库系统提供了内置的相关工具。
++ 一些数据库系统允许触发器定义为 not for replication，保证触发器不会在数据库备份的时候在备份站点执行，或者提供一个系统变量用于指明该数据库是一个副本，数据库动作在其上是回放，触发器无需执行。这两种方案都不需要显式地将触发器设为失效或有效。
+
+&emsp;&emsp;写触发器时，应特别小心。运行期的一个触发器错误会导致引发该触发器的动作语句失败。而且，一个触发器的动作可以引发另一个触发器，这可能导致一个无限的触发链。  
+&emsp;&emsp;触发器是很有用的工具，但是如果有其他的候选方案就最好别用触发器。很多触发器的应用都可以用适当的存储过程来替换。
+
+### （4）地柜查询
+
+### （5）高级聚集特性
+
+### （6）OLAP
