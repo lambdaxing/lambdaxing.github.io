@@ -1518,4 +1518,3 @@ create table 命令允许的完整性约束包括：
 &emsp;&emsp;
 &emsp;&emsp;
 &emsp;&emsp;
-&emsp;&emsp;
